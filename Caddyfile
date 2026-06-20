@@ -1,0 +1,58 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	log {
+		format json
+	}
+
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:{$PORT:80} {
+	log {
+		format json
+	}
+
+	respond /health 200
+
+	# Security headers
+	header {
+		# Enable cross-site filter (XSS) and tell browsers to block detected attacks
+		X-XSS-Protection "1; mode=block"
+		# Prevent some browsers from MIME-sniffing a response away from the declared Content-Type
+		X-Content-Type-Options "nosniff"
+		# Keep referrer data off of HTTP connections
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# CSP allows blob: so the self-contained prototype can unpack its embedded
+		# scripts, fonts, and assets into blob: URLs at runtime.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https: *; style-src 'self' 'unsafe-inline' https: *; script-src 'self' 'unsafe-inline' blob: https: *; font-src 'self' data: blob: https: *; connect-src 'self' blob: data: https: *; media-src 'self' blob: https: *; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; frame-src 'self' https: *;"
+		# Remove Server header
+		-Server
+	}
+
+	root * {$RAILPACK_STATIC_FILE_ROOT:/app}
+
+	# Handle static files
+	file_server {
+		hide .git
+		hide .env*
+	}
+
+	# Compression with more formats
+	encode {
+		gzip
+		zstd
+	}
+
+	# Try files with HTML extension and fall back to index.html
+	try_files {path} {path}.html {path}/index.html /index.html
+
+	handle_errors {
+		rewrite * /{err.status_code}.html
+		file_server
+	}
+}
